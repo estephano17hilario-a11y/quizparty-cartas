@@ -2,64 +2,160 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#120a2e">
 <title>Carta · QuizParty</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Fredoka:wght@500;600;700&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Great+Vibes&family=Dancing+Script:wght@500;700&family=Caveat:wght@500;700&family=Cinzel:wght@500;700&family=Cormorant+Garamond:ital,wght@0,500;0,700;1,500&family=Lobster&family=Pacifico&family=Permanent+Marker&family=Abril+Fatface&family=Special+Elite&family=Bangers&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/cards.css">
 </head>
-<body>
+<body class="vw-body">
 <div class="bg"><i></i><i></i><i></i></div>
-<main id="m" class="cp">
+<main id="m" class="vw">
   <div class="panel center-txt">
-    <div style="font-size:2.5rem;margin-bottom:0.5rem;animation:pulse 1.2s infinite">🃏</div>
-    <h2>Cargando carta...</h2>
-    <p class="mut">Obteniendo información del servidor</p>
+    <div style="font-size:2.5rem;margin-bottom:0.5rem;animation:pulse 1.2s infinite">💌</div>
+    <h2>Abriendo tu carta…</h2>
+    <p class="mut">Un momento</p>
   </div>
 </main>
+<script src="/vendor/qrcode.js"></script>
 <script src="/cardview.js"></script>
+<script src="/qrstyle.js"></script>
 <script>
 (async () => {
   const m = document.getElementById('m');
+  const CV = CardView;
   const pathParts = location.pathname.split('/').filter(Boolean);
   const id = decodeURIComponent(pathParts[pathParts.length - 1] || '');
+  const notFound = (t, p) => { m.innerHTML = '<div class="panel center-txt"><div class="big-emoji">🔎</div><h2>' + t + '</h2><p class="mut">' + p + '</p><a class="btn ghost" href="/">Ir a QuizParty</a></div>'; };
 
-  if (!id || id === 'c') {
-    m.innerHTML = '<div class="panel center-txt"><div class="big-emoji">🔎</div><h2>QR o URL no válido</h2><p class="mut">Escanea nuevamente el código QR de tu carta.</p><a class="btn ghost" href="/">Ir a QuizParty</a></div>';
-    return;
-  }
+  if (!id || id === 'c') return notFound('QR o URL no válido', 'Escanea nuevamente el código QR de tu carta.');
 
+  let c;
   try {
     const vpsUrl = 'https://quizparty.89.117.73.97.sslip.io';
     let r = await fetch('/api/cards/' + encodeURIComponent(id)).catch(() => null);
-    if (!r || !r.ok) {
-      r = await fetch(vpsUrl + '/api/cards/' + encodeURIComponent(id)).catch(() => null);
-    }
+    if (!r || !r.ok) r = await fetch(vpsUrl + '/api/cards/' + encodeURIComponent(id)).catch(() => null);
     if (!r || !r.ok) throw new Error('404');
-    const c = await r.json();
-    document.title = c.name + ' · Carta QuizParty';
-    m.innerHTML = '<div class="tilt" style="touch-action:none">' + CardView.html(c.name, c.data) + '</div><a class="btn ghost" href="/">Ir a QuizParty</a>';
-    const t = m.querySelector('.tilt'), card = m.querySelector('.tcard');
-    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (!reduce && t && card) {
-      const handleMove = (clientX, clientY) => {
-        const b = t.getBoundingClientRect();
-        const x = (clientX - b.left) / b.width - 0.5;
-        const y = (clientY - b.top) / b.height - 0.5;
-        card.style.transform = 'rotateY(' + (x * 18) + 'deg) rotateX(' + (-y * 18) + 'deg)';
-      };
-      t.addEventListener('pointermove', (e) => handleMove(e.clientX, e.clientY));
-      t.addEventListener('pointerleave', () => { card.style.transform = ''; });
-      t.addEventListener('touchmove', (e) => {
-        if (e.touches && e.touches[0]) handleMove(e.touches[0].clientX, e.touches[0].clientY);
-      }, { passive: true });
-      t.addEventListener('touchend', () => { card.style.transform = ''; });
-    }
-  } catch (e) {
-    m.innerHTML = '<div class="panel center-txt"><div class="big-emoji">🔎</div><h2>No encontramos esta carta</h2><p class="mut">Puede que se haya eliminado o que el identificador sea incorrecto.</p><a class="btn ghost" href="/">Ir a QuizParty</a></div>';
+    c = await r.json();
+  } catch (e) { return notFound('No encontramos esta carta', 'Puede que se haya eliminado o que el identificador sea incorrecto.'); }
+
+  document.title = c.name + ' · Carta';
+  const d = CV.norm(c.data), hasBack = !!d.back;
+  const card = { id: c.id, name: c.name, qr: c.qr || {} };
+  const url = location.origin + '/c/' + encodeURIComponent(c.id);
+  const front = d.front || CV.emptyFace(), bg = front.bg || {};
+  const A = CV.hex(bg.c1, '#4c1d95'), B = CV.hex(bg.c2, CV.hex(bg.c1, '#be185d'));
+  const ratio = CV.ratioOf(d);
+  const env = d.env && d.env.on ? d.env : null;
+  const fx = d.fx || {};
+
+  // el QR de la carta (si lo lleva) se dibuja con el mismo estilo que se diseñó
+  let qrSrc;
+  if (CV.findQR(d)) { try { qrSrc = await CV.qrSrc(url, CV.qrOptions(card)); } catch (e) { /* sin QR */ } }
+  const o = (side) => ({ side, qrSrc, qr: card.qr });
+
+  m.style.setProperty('--a', A); m.style.setProperty('--b', B);
+  m.innerHTML = '<div class="vw-amb"></div>'
+    + '<div class="vw-stage' + (env ? ' sealed' : '') + '" id="stage">'
+    + (env ? '<div class="env" id="env" style="--ec:' + CV.hex(env.color, '#e8d9b5') + ';--ec2:' + CV.shade(CV.hex(env.color, '#e8d9b5'), 0.12) + ';--ec3:' + CV.shade(CV.hex(env.color, '#e8d9b5'), -0.12) + '"><div class="env-back"></div><div class="env-flap"></div><div class="env-pocket"></div>'
+      + '<button class="env-seal" id="seal" aria-label="Abrir el sobre">' + CV.layerHtml(CV.newLayer('seal', { color: CV.hex(env.seal, '#9b1c2e'), glyph: env.glyph || '❤', w: 100, x: 50, y: 50 }), d, c.name, {}).replace(/<div class="ly[^>]*?style="[^"]*"/, '<div style="width:100%;height:100%"') + '</button>'
+      + '<div class="env-hint" id="envh">Toca el sello para abrir 💌</div></div>' : '')
+    + '<div class="persp"><div class="tilt" id="tilt"><div class="flipc" id="flip" style="--ar:' + ratio + ';--rad:' + (d.radius || 4) + '">'
+    + '<div class="face f">' + CV.html(c.name, d, o('front')) + '<div class="glare"></div></div>'
+    + (hasBack ? '<div class="face b">' + CV.html(c.name, d, o('back')) + '<div class="glare"></div></div>' : '')
+    + '</div></div></div></div>'
+    + '<div class="vw-hint" id="hint"></div>'
+    + '<div class="vw-parts' + (fx.mode === 'rise' ? ' rise' : '') + '" id="parts"></div>'
+    + '<div class="vw-bar' + (env ? ' vw-wait' : '') + '" id="bar">'
+    + (hasBack ? '<button class="btn primary sm" data-dl="front">⬇ Descargar frente</button><button class="btn primary sm" data-dl="back">⬇ Descargar reverso</button>' : '<button class="btn primary sm" data-dl="front">⬇ Descargar imagen</button>')
+    + '<a class="btn ghost sm" href="/">Ir a QuizParty</a></div>';
+
+  const stage = document.getElementById('stage'), tilt = document.getElementById('tilt'), flip = document.getElementById('flip'), hint = document.getElementById('hint');
+  const fit = () => {
+    const w = Math.min(window.innerWidth - 28, (window.innerHeight - 150) * ratio, ratio >= 1 ? 620 : 420);
+    stage.style.setProperty('--cw', Math.floor(Math.max(200, w)) + 'px');
+    const minH = Math.floor(Math.max(200, w) / ratio);
+    stage.style.minHeight = (env ? Math.max(minH, Math.floor(Math.max(200, w) * 0.7)) : minH) + 'px';
+  };
+  fit(); addEventListener('resize', fit);
+
+  // partículas flotantes
+  const parts = Array.from(String(fx.particles || '').replace(/\s+/g, '').match(/\p{Extended_Pictographic}(?:️|‍\p{Extended_Pictographic})*|[^\s]/gu) || []).slice(0, 4);
+  if (parts.length && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const box = document.getElementById('parts');
+    const start = () => {
+      for (let i = 0; i < 16; i++) {
+        const s = document.createElement('span');
+        s.textContent = parts[i % parts.length];
+        s.style.cssText = 'left:' + (Math.random() * 100) + '%;font-size:' + (14 + Math.random() * 22) + 'px;animation-duration:' + (7 + Math.random() * 8) + 's;animation-delay:' + (-Math.random() * 12) + 's;--dx:' + ((Math.random() - 0.5) * 120) + 'px;--rot:' + ((Math.random() - 0.5) * 540) + 'deg';
+        box.appendChild(s);
+      }
+    };
+    if (env) { document.addEventListener('opened', start, { once: true }); } else start();
   }
+
+  // inclinación 3D + brillo que sigue al dedo / cursor
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const faces = [...m.querySelectorAll('.face')];
+  let flipped = false, down = null, moved = false;
+  const point = (cx, cy) => {
+    const b = flip.getBoundingClientRect();
+    const x = (cx - b.left) / b.width, y = (cy - b.top) / b.height;
+    if (!reduce) tilt.style.transform = 'rotateY(' + ((x - 0.5) * 22) + 'deg) rotateX(' + (-(y - 0.5) * 22) + 'deg)';
+    const gx = (flipped ? 1 - x : x) * 100;
+    faces.forEach((f) => { f.style.setProperty('--gx', gx + '%'); f.style.setProperty('--gy', y * 100 + '%'); f.style.setProperty('--go', '1'); });
+  };
+  const rest = () => { tilt.style.transform = ''; faces.forEach((f) => f.style.setProperty('--go', '0')); };
+  flip.addEventListener('pointermove', (e) => { if (e.pointerType === 'mouse' || down) { point(e.clientX, e.clientY); if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 8) moved = true; } });
+  flip.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY }; moved = false; tilt.classList.add('drag'); point(e.clientX, e.clientY); });
+  const up = () => { tilt.classList.remove('drag'); if (down && !moved && hasBack && !stage.classList.contains('sealed')) { flipped = !flipped; flip.classList.toggle('flipped', flipped); } down = null; setTimeout(rest, 60); };
+  flip.addEventListener('pointerup', up); flip.addEventListener('pointercancel', () => { down = null; rest(); });
+  flip.addEventListener('pointerleave', () => { if (!down) rest(); });
+  if (!reduce && window.DeviceOrientationEvent && !/iPhone|iPad/.test(navigator.userAgent)) {
+    addEventListener('deviceorientation', (e) => { if (down || e.gamma == null) return; tilt.style.transform = 'rotateY(' + Math.max(-14, Math.min(14, e.gamma / 2.5)) + 'deg) rotateX(' + Math.max(-14, Math.min(14, -((e.beta || 45) - 45) / 2.5)) + 'deg)'; });
+  }
+  // descargar la carta como imagen (frente y reverso)
+  const bar = document.getElementById('bar');
+  const safe = (c.name || 'carta').replace(/[^\w\-áéíóúñÁÉÍÓÚÑ ]+/g, '').trim().replace(/\s+/g, '_') || 'carta';
+  bar.addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-dl]'); if (!b || b.disabled) return;
+    const side = b.dataset.dl, label = b.textContent;
+    b.disabled = true; b.textContent = 'Preparando imagen…';
+    try {
+      const blob = await CV.toPNG(c.name, d, { side, qrSrc, qr: card.qr, width: 1200 });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = safe + (hasBack ? (side === 'back' ? '_reverso' : '_frente') : '') + '.png';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+      b.textContent = '✔ Guardada';
+      setTimeout(() => { b.textContent = label; b.disabled = false; }, 1800);
+    } catch (err) {
+      b.textContent = 'No se pudo guardar 😕';
+      hint.textContent = 'Si tu navegador no lo permite, haz una captura de pantalla de la carta.';
+      setTimeout(() => { b.textContent = label; b.disabled = false; }, 2500);
+    }
+  });
+  const msg = () => { hint.textContent = hasBack ? 'Toca la carta para darle la vuelta ↻' : ''; };
+
+  // sobre
+  if (env) {
+    const open = () => {
+      const e = document.getElementById('env');
+      if (!e || e.classList.contains('open')) return;
+      e.classList.add('open');
+      document.getElementById('envh').remove();
+      setTimeout(() => stage.classList.add('rising'), 500);
+      setTimeout(() => { stage.classList.remove('sealed'); stage.classList.add('out'); }, 1400);
+      setTimeout(() => { stage.classList.remove('rising'); document.dispatchEvent(new Event('opened')); bar.classList.remove('vw-wait'); msg(); }, 1500);
+      setTimeout(() => e.remove(), 2600);
+    };
+    document.getElementById('seal').addEventListener('click', open);
+    document.getElementById('env').addEventListener('click', open);
+  } else msg();
 })();
 </script>
 </body>

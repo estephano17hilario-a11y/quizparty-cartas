@@ -103,7 +103,7 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json({ limit: '12mb' }));
+app.use(express.json({ limit: '16mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/health', (req, res) => res.json({ status: 'ok', time: Date.now() }));
 app.get('/vendor/qrcode.js', (req, res) => res.sendFile(require.resolve('qrcode-generator')));
@@ -195,15 +195,26 @@ app.delete('/api/quizzes/:id', requireAdmin, wrap((req, res) => {
 /* ── Cartas ── */
 const newCardId = () => crypto.randomBytes(6).toString('base64url');
 function imgOnly(v) { return typeof v === 'string' && /^data:image\//.test(v) ? v : ''; }
+function cleanFace(f) {
+  if (!f || typeof f !== 'object') return null;
+  if (f.bg && typeof f.bg === 'object') f.bg.img = imgOnly(f.bg.img);
+  f.layers = (Array.isArray(f.layers) ? f.layers : []).filter((l) => l && typeof l === 'object').slice(0, 120);
+  f.layers.forEach((l) => { if (l.t === 'image') l.src = imgOnly(l.src); else delete l.src; });
+  return f;
+}
 function cleanCard(b) {
   const name = String((b && b.name) || '').trim().slice(0, 60);
   if (!name) throw new Error('La carta necesita un nombre');
   const data = b.data && typeof b.data === 'object' ? b.data : {};
   const qr = b.qr && typeof b.qr === 'object' ? b.qr : {};
-  data.image = imgOnly(data.image);
+  if (data.v === 2) { // carta personalizada: se limpian las imágenes de cada capa
+    data.front = cleanFace(data.front) || { layers: [] };
+    data.back = cleanFace(data.back);
+  } else data.image = imgOnly(data.image);
   qr.logo = imgOnly(qr.logo);
+  qr.bgImage = imgOnly(qr.bgImage);
   const d = JSON.stringify(data), q = JSON.stringify(qr);
-  if (d.length > 3_000_000 || q.length > 1_500_000) throw new Error('Alguna imagen es demasiado grande');
+  if (d.length > 9_000_000 || q.length > 2_500_000) throw new Error('Las imágenes pesan demasiado: usa menos fotos o más pequeñas');
   return { name, d, q };
 }
 app.get('/api/cards', requireAdmin, wrap((req, res) => {
@@ -211,9 +222,9 @@ app.get('/api/cards', requireAdmin, wrap((req, res) => {
     .map((r) => ({ id: r.id, name: r.name, data: JSON.parse(r.data), qr: JSON.parse(r.qr), updated_at: r.updated_at })));
 }));
 app.get('/api/cards/:id', wrap((req, res) => { // público: lo abre el QR
-  const r = db.prepare('SELECT id,name,data FROM cards WHERE id=?').get(req.params.id);
+  const r = db.prepare('SELECT id,name,data,qr FROM cards WHERE id=?').get(req.params.id);
   if (!r) return res.status(404).json({ error: 'Carta no encontrada' });
-  res.json({ id: r.id, name: r.name, data: JSON.parse(r.data) });
+  res.json({ id: r.id, name: r.name, data: JSON.parse(r.data), qr: JSON.parse(r.qr) });
 }));
 app.post('/api/cards', requireAdmin, wrap((req, res) => {
   const { name, d, q } = cleanCard(req.body);
