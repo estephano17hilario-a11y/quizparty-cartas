@@ -1,0 +1,52 @@
+# QuizParty + Cartas QR
+
+Quiz en vivo estilo Kahoot y creador de cartas con QR decorado, con base de datos SQLite propia en tu servidor.
+
+## Cómo funciona
+
+- **Una sola sala.** Entras con un nombre de usuario:
+  - `gianelletecprata18` → **anfitrión** (pide el PIN si configuraste `ADMIN_PIN`).
+  - Cualquier otro nombre → **jugador** de la sala.
+- **Anfitrión**
+  - 🎮 **Juego**: elige un quiz, marca qué preguntas entran, el tiempo de cada una y si empieza manualmente o a una fecha y hora programadas. Controla la partida en vivo (empezar, saltar, terminar, sacar jugadores).
+  - ❓ **Preguntas**: crea y edita quizzes (2 a 4 opciones, tiempo y puntos por pregunta).
+  - 🃏 **Cartas**: crea cartas con imagen, colores y estadísticas. Cada carta se guarda con su nombre y tiene un QR que abre `/c/<id>` (esa carta en específico).
+    - Decora el QR: forma de puntos y esquinas, colores, degradado, marco, nombre debajo, logo o emoji al centro.
+    - Selecciona varias cartas → **Imprimir lote**: elige tamaño, papel, orientación, margen, separación, copias y guías de corte. Todo se imprime proporcionado (o guarda como PDF desde el diálogo de impresión).
+  - 📊 **Historial**: resultados de cada partida terminada.
+- Todo se guarda en `data/app.db` (SQLite).
+
+## Instalar en el VPS
+
+Desde tu computadora, dentro de esta carpeta:
+
+1. Edita `ecosystem.config.js`: pon tu `ADMIN_PIN` y, si quieres, la `PUBLIC_URL` (la dirección que irá dentro de los QR).
+2. Ejecuta `./deploy.sh root@89.117.73.97`
+
+Instalación manual en el servidor (equivale al script):
+
+```bash
+cd /opt/quizparty
+npm install --omit=dev
+npm i -g pm2 && pm2 start ecosystem.config.js && pm2 save && pm2 startup
+ufw allow 3000/tcp   # si usas ufw
+```
+
+Para probar en local: `npm install && ADMIN_PIN=1234 node server.js` y abre http://localhost:3000
+
+## Variables de entorno
+
+| Variable | Para qué sirve | Por defecto |
+|---|---|---|
+| `PORT` | Puerto | 3000 |
+| `ADMIN_USER` | Nombre que entra como anfitrión | gianelletecprata18 |
+| `ADMIN_PIN` | PIN extra para el anfitrión (recomendado) | vacío = sin PIN |
+| `PUBLIC_URL` | URL pública que llevan los QR | la que use el navegador |
+| `DB_FILE` | Ruta de la base de datos | `data/app.db` |
+
+## Importante
+
+- **Los QR impresos apuntan a `PUBLIC_URL`.** Si más adelante cambias de dirección, los QR ya impresos seguirían apuntando a la anterior. Si puedes, usa un dominio fijo (con HTTPS vía Caddy o nginx) antes de imprimir en serio.
+- **Sin PIN, cualquiera que escriba el nombre del anfitrión controla todo.** Define `ADMIN_PIN`.
+- Respaldo: copia el archivo `data/app.db`.
+- Requiere Node 18 o superior.

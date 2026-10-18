@@ -1,0 +1,15 @@
+services:
+  quizparty:
+    build: .
+    container_name: quizparty_app
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:3200:3000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - PORT=3000
+      - ADMIN_USER=${ADMIN_USER:-gianelletecprata18}
+      - ADMIN_PIN=${ADMIN_PIN:-estephano10FM20}
+      - PUBLIC_URL=${PUBLIC_URL:-https://quizparty-cartas.vercel.app}
+      - DB_FILE=/app/data/app.db

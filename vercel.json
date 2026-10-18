@@ -1,0 +1,9 @@
+{
+  "version": 2,
+  "rewrites": [
+    {
+      "source": "/c/:id",
+      "destination": "/card.html"
+    }
+  ]
+}

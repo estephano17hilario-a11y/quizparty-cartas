@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#120a2e">
+<title>Carta · QuizParty</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="bg"><i></i><i></i><i></i></div>
+<main id="m" class="cp">
+  <div class="panel center-txt">
+    <div style="font-size:2.5rem;margin-bottom:0.5rem;animation:pulse 1.2s infinite">🃏</div>
+    <h2>Cargando carta...</h2>
+    <p class="mut">Obteniendo información del servidor</p>
+  </div>
+</main>
+<script src="/cardview.js"></script>
+<script>
+(async () => {
+  const m = document.getElementById('m');
+  const pathParts = location.pathname.split('/').filter(Boolean);
+  const id = decodeURIComponent(pathParts[pathParts.length - 1] || '');
+
+  if (!id || id === 'c') {
+    m.innerHTML = '<div class="panel center-txt"><div class="big-emoji">🔎</div><h2>QR o URL no válido</h2><p class="mut">Escanea nuevamente el código QR de tu carta.</p><a class="btn ghost" href="/">Ir a QuizParty</a></div>';
+    return;
+  }
+
+  try {
+    const vpsUrl = 'https://quizparty.89.117.73.97.sslip.io';
+    let r = await fetch('/api/cards/' + encodeURIComponent(id)).catch(() => null);
+    if (!r || !r.ok) {
+      r = await fetch(vpsUrl + '/api/cards/' + encodeURIComponent(id)).catch(() => null);
+    }
+    if (!r || !r.ok) throw new Error('404');
+    const c = await r.json();
+    document.title = c.name + ' · Carta QuizParty';
+    m.innerHTML = '<div class="tilt" style="touch-action:none">' + CardView.html(c.name, c.data) + '</div><a class="btn ghost" href="/">Ir a QuizParty</a>';
+    const t = m.querySelector('.tilt'), card = m.querySelector('.tcard');
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!reduce && t && card) {
+      const handleMove = (clientX, clientY) => {
+        const b = t.getBoundingClientRect();
+        const x = (clientX - b.left) / b.width - 0.5;
+        const y = (clientY - b.top) / b.height - 0.5;
+        card.style.transform = 'rotateY(' + (x * 18) + 'deg) rotateX(' + (-y * 18) + 'deg)';
+      };
+      t.addEventListener('pointermove', (e) => handleMove(e.clientX, e.clientY));
+      t.addEventListener('pointerleave', () => { card.style.transform = ''; });
+      t.addEventListener('touchmove', (e) => {
+        if (e.touches && e.touches[0]) handleMove(e.touches[0].clientX, e.touches[0].clientY);
+      }, { passive: true });
+      t.addEventListener('touchend', () => { card.style.transform = ''; });
+    }
+  } catch (e) {
+    m.innerHTML = '<div class="panel center-txt"><div class="big-emoji">🔎</div><h2>No encontramos esta carta</h2><p class="mut">Puede que se haya eliminado o que el identificador sea incorrecto.</p><a class="btn ghost" href="/">Ir a QuizParty</a></div>';
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "name": "quizparty-cartas",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Quiz en vivo estilo Kahoot + creador de cartas con QR y base de datos propia",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "better-sqlite3": "^11.5.0 || ^12.0.0",
+    "express": "^4.21.0",
+    "qrcode-generator": "^1.4.4",
+    "socket.io": "^4.8.0"
+  }
+}
