@@ -1,0 +1,7 @@
+server.js
+Dockerfile
+docker-compose.yml
+ecosystem.config.js
+deploy.sh
+data
+*.log
